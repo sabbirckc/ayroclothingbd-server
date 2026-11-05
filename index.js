@@ -25,37 +25,37 @@ const allowedOrigins = [
   ...clientUrls
 ];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
+    app.use(cors({
+      origin: (origin, callback) => {
+        // allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+          return callback(null, true);
+        }
     return callback(null, true); // Dev-friendly fallback
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+    },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
 
-app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(cookieParser());
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Database connection middleware
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (dbErr) {
-    console.error('Database connection middleware error:', dbErr);
-    res.status(500).json({ success: false, error: 'Failed to establish database connection.' });
-  }
-});
+  // Database connection middleware
+  app.use(async (req, res, next) => {
+    try {
+      await connectDB();
+      next();
+    } catch (dbErr) {
+      console.error('Database connection middleware error:', dbErr);
+      res.status(500).json({ success: false, error: 'Failed to establish database connection.' });
+    }
+  });
 
-// Root API Health Check
-app.get('/', (req, res) => {
+  // Root API Health Check
+  app.get('/', (req, res) => {
   res.json({
     status: 'healthy',
     message: 'ClothSpace Peer-to-Peer Apparel Marketplace Server API is operating smoothly.',

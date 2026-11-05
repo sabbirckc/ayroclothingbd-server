@@ -40,3 +40,4 @@ High-performance Express.js and MongoDB Atlas backend for **ClothSpace — Peer-
 - **Examiner Email**: `examiner@clothspace.com`
 - **Password**: `ClothSpace2026!`
 - **Role**: `designer`
+

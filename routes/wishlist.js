@@ -75,3 +75,4 @@ router.post('/toggle', verifyJWT, async (req, res) => {
 });
 
 export default router;
+

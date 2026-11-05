@@ -49,3 +49,4 @@ export function getCollections() {
 }
 
 export { client };
+
