@@ -12,7 +12,9 @@ router.get('/', verifyJWT, async (req, res) => {
     const userEmail = req.user.email.toLowerCase();
 
     const items = await wishlistCollection.find({ userEmail }).toArray();
-    const clothIds = items.map(i => new ObjectId(i.clothId));
+    const clothIds = items
+      .map(i => (ObjectId.isValid(i.clothId) ? new ObjectId(i.clothId) : null))
+      .filter(Boolean);
 
     const clothes = await clothesCollection.find({ _id: { $in: clothIds } }).toArray();
 

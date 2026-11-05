@@ -1,8 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { ObjectId } from 'mongodb';
-import { getCollections } from '../db.js';
+import { getCollections, connectDB } from '../db.js';
 import { verifyJWT } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -227,7 +226,13 @@ router.post('/social-login', async (req, res) => {
 router.get('/me', verifyJWT, async (req, res) => {
   try {
     const { usersCollection } = getCollections();
-    const user = await usersCollection.findOne({ email: req.user.email.toLowerCase() });
+    const normalizedEmail = req.user.email.toLowerCase();
+    let user = await usersCollection.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      const db = await connectDB();
+      user = await db.collection('user').findOne({ email: normalizedEmail });
+    }
 
     if (!user) {
       return res.status(404).json({ success: false, error: 'User profile not found.' });
@@ -239,7 +244,7 @@ router.get('/me', verifyJWT, async (req, res) => {
         id: user._id.toString(),
         name: user.name,
         email: user.email,
-        photoURL: user.photoURL,
+        photoURL: user.image || user.photoURL || '/client-review-1.jpg',
         role: user.role || 'designer'
       }
     });
