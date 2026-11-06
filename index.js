@@ -55,7 +55,7 @@ app.use(async (req, res, next) => {
 app.get('/', (req, res) => {
   res.json({
     status: 'healthy',
-    message: 'ClothSpace Peer-to-Peer Apparel Marketplace Server API is operating smoothly.',
+    message: 'AYRO Clothing BD Apparel Marketplace Server API is operating smoothly.',
     version: '1.0.0',
     timestamp: new Date().toISOString()
   });

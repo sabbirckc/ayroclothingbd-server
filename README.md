@@ -1,6 +1,6 @@
-# ClothSpace API Server
+# AYRO Clothing BD API Server
 
-High-performance Express.js and MongoDB Atlas backend for **ClothSpace — Peer-to-Peer Apparel Marketplace & Designer Clothing Sharing Platform**.
+High-performance Express.js and MongoDB Atlas backend for **AYRO Clothing BD — Timeless Essential Apparel Marketplace**.
 
 ## Key Features & Challenges Implemented
 - **Challenge 1 (JWT Security with HTTPOnly Cookies)**: All data-modifying routes (`POST /api/clothes`, `DELETE /api/clothes/:id`, `POST /api/orders`) are guarded with JWT verification. Tokens are set in secure HTTPOnly cookies with Bearer header fallback.
