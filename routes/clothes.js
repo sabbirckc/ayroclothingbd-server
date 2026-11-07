@@ -97,7 +97,7 @@ router.get('/', async (req, res) => {
 
     const query = {};
 
-    // Search query on title, overview, fabric
+    // Search query on title, overview, fabric, subcategory
     if (search && search.trim() !== '') {
       const searchRegex = { $regex: search.trim(), $options: 'i' };
       query.$or = [
@@ -105,7 +105,8 @@ router.get('/', async (req, res) => {
         { overview: searchRegex },
         { fabric: searchRegex },
         { brandOrigin: searchRegex },
-        { category: searchRegex }
+        { category: searchRegex },
+        { subcategory: searchRegex }
       ];
     }
 
