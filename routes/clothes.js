@@ -86,6 +86,8 @@ router.get('/', async (req, res) => {
     const {
       search,
       category,
+      subCategory,
+      subcategory,
       size,
       fabric,
       minPrice,
@@ -106,7 +108,7 @@ router.get('/', async (req, res) => {
         { fabric: searchRegex },
         { brandOrigin: searchRegex },
         { category: searchRegex },
-        { subcategory: searchRegex }
+        { subCategory: searchRegex }
       ];
     }
 
@@ -114,6 +116,12 @@ router.get('/', async (req, res) => {
     if (category && category !== 'all' && category !== 'All') {
       const cleanCat = category.replace(/s$/i, '');
       query.category = { $regex: new RegExp(`^${cleanCat}s?$`, 'i') };
+    }
+
+    // Subcategory filter
+    const activeSubCat = subCategory || subcategory;
+    if (activeSubCat && activeSubCat !== 'all' && activeSubCat !== 'All') {
+      query.subCategory = { $regex: new RegExp(`^${activeSubCat.trim()}$`, 'i') };
     }
 
     // Size filter
@@ -198,6 +206,7 @@ router.post('/', verifyJWT, async (req, res) => {
     const {
       title,
       category,
+      subCategory,
       price,
       stock,
       sizes,
@@ -233,6 +242,7 @@ router.post('/', verifyJWT, async (req, res) => {
     const newCloth = {
       title: title.trim(),
       category: category.trim(),
+      subCategory: (subCategory || 'Classic Fit').trim(),
       price: numPrice,
       stock: numStock,
       sizes: Array.isArray(sizes) && sizes.length > 0 ? sizes : ['M', 'L'],
@@ -291,6 +301,7 @@ router.put('/:id', verifyJWT, async (req, res) => {
     const {
       title,
       category,
+      subCategory,
       price,
       stock,
       sizes,
@@ -306,6 +317,7 @@ router.put('/:id', verifyJWT, async (req, res) => {
       $set: {
         ...(title && { title: title.trim() }),
         ...(category && { category: category.trim() }),
+        ...(subCategory && { subCategory: subCategory.trim() }),
         ...(price !== undefined && { price: Number(price) }),
         ...(stock !== undefined && { stock: Number(stock) }),
         ...(sizes && { sizes: Array.isArray(sizes) ? sizes : [sizes] }),
