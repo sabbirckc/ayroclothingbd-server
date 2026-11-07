@@ -111,7 +111,8 @@ router.get('/', async (req, res) => {
 
     // Category filter
     if (category && category !== 'all' && category !== 'All') {
-      query.category = { $regex: new RegExp(`^${category}$`, 'i') };
+      const cleanCat = category.replace(/s$/i, '');
+      query.category = { $regex: new RegExp(`^${cleanCat}s?$`, 'i') };
     }
 
     // Size filter
