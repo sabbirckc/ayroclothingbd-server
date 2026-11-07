@@ -1,7 +1,7 @@
 import express from 'express';
 import { ObjectId } from 'mongodb';
 import { getCollections } from '../db.js';
-import { verifyJWT } from '../middleware/auth.js';
+import { verifyJWT, verifyAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -59,14 +59,14 @@ router.get('/categories', async (req, res) => {
   }
 });
 
-// GET /api/clothes/my-listings -> Private Route, filter by logged-in user email
-router.get('/my-listings', verifyJWT, async (req, res) => {
+// GET /api/clothes/my-listings -> Private Route (Admin Only)
+router.get('/my-listings', verifyJWT, verifyAdmin, async (req, res) => {
   try {
     const { clothesCollection } = getCollections();
-    const userEmail = req.user.email.toLowerCase();
 
+    // Admin can view all clothing listings in inventory
     const listings = await clothesCollection
-      .find({ ownerEmail: userEmail })
+      .find({})
       .sort({ createdAt: -1 })
       .toArray();
 
@@ -112,16 +112,40 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    // Category filter
+    // Category filter & Subcategory filter handling
+    const activeSubCat = subCategory || subcategory;
+
+    // Check if category passed is actually a subcategory like "Classic Fit"
     if (category && category !== 'all' && category !== 'All') {
-      const cleanCat = category.replace(/s$/i, '');
-      query.category = { $regex: new RegExp(`^${cleanCat}s?$`, 'i') };
+      const isSubCatParam = /classic|formal|half sleeve|over shirt|casual|semi-fitted|kabli|cotton|silk|chino|denim|cargo|hoodie|jacket|sweater|blazer/i.test(category);
+      if (isSubCatParam && !activeSubCat) {
+        const subRegex = new RegExp(category.trim(), 'i');
+        query.$or = [
+          { subCategory: { $regex: subRegex } },
+          { category: { $regex: subRegex } },
+          { title: { $regex: subRegex } },
+          { overview: { $regex: subRegex } }
+        ];
+      } else {
+        const cleanCat = category.replace(/s$/i, '');
+        query.category = { $regex: new RegExp(`^${cleanCat}s?$`, 'i') };
+      }
     }
 
     // Subcategory filter
-    const activeSubCat = subCategory || subcategory;
     if (activeSubCat && activeSubCat !== 'all' && activeSubCat !== 'All') {
-      query.subCategory = { $regex: new RegExp(`^${activeSubCat.trim()}$`, 'i') };
+      const subRegex = new RegExp(activeSubCat.trim(), 'i');
+      const subConditions = [
+        { subCategory: { $regex: subRegex } },
+        { title: { $regex: subRegex } },
+        { overview: { $regex: subRegex } }
+      ];
+      if (query.$or) {
+        query.$and = [{ $or: query.$or }, { $or: subConditions }];
+        delete query.$or;
+      } else {
+        query.$or = subConditions;
+      }
     }
 
     // Size filter
@@ -200,8 +224,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/clothes -> Add New Clothing (Protected - Challenge 1)
-router.post('/', verifyJWT, async (req, res) => {
+// POST /api/clothes -> Add New Clothing (Protected: Admin Only)
+router.post('/', verifyJWT, verifyAdmin, async (req, res) => {
   try {
     const {
       title,
@@ -236,7 +260,7 @@ router.post('/', verifyJWT, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Stock quantity cannot be negative.' });
     }
 
-    const primaryImage = image || (Array.isArray(images) && images[0]) || '/image-1.jpg';
+    const primaryImage = image || (Array.isArray(images) && images[0]) || '/classic-shirt-1.jpg';
     const gallery = Array.isArray(images) && images.length > 0 ? images : [primaryImage];
 
     const newCloth = {
@@ -253,7 +277,7 @@ router.post('/', verifyJWT, async (req, res) => {
       careInstructions: Array.isArray(careInstructions) ? careInstructions : ['Dry Clean Recommended'],
       overview: overview?.trim() || 'Exquisite handcrafted apparel tailored with premium fabrics and modern aesthetics.',
       ownerEmail: req.user.email.toLowerCase(),
-      ownerName: req.user.name || 'Boutique Designer',
+      ownerName: req.user.name || 'Admin',
       rating: 5.0,
       reviewsCount: 1,
       ordersCount: 0,
@@ -275,8 +299,8 @@ router.post('/', verifyJWT, async (req, res) => {
   }
 });
 
-// PUT /api/clothes/:id -> Update Cloth (Protected)
-router.put('/:id', verifyJWT, async (req, res) => {
+// PUT /api/clothes/:id -> Update Cloth (Protected: Admin Only)
+router.put('/:id', verifyJWT, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     if (!ObjectId.isValid(id)) {
@@ -288,14 +312,6 @@ router.put('/:id', verifyJWT, async (req, res) => {
 
     if (!existing) {
       return res.status(404).json({ success: false, error: 'Clothing listing not found.' });
-    }
-
-    // Ensure the updater is the owner
-    if (existing.ownerEmail.toLowerCase() !== req.user.email.toLowerCase()) {
-      return res.status(403).json({
-        success: false,
-        error: 'Forbidden: You are not authorized to edit this listing.'
-      });
     }
 
     const {
@@ -345,8 +361,8 @@ router.put('/:id', verifyJWT, async (req, res) => {
   }
 });
 
-// DELETE /api/clothes/:id -> Delete Cloth (Protected - Challenge 1)
-router.delete('/:id', verifyJWT, async (req, res) => {
+// DELETE /api/clothes/:id -> Delete Cloth (Protected: Admin Only)
+router.delete('/:id', verifyJWT, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     if (!ObjectId.isValid(id)) {
@@ -358,14 +374,6 @@ router.delete('/:id', verifyJWT, async (req, res) => {
 
     if (!existing) {
       return res.status(404).json({ success: false, error: 'Clothing listing not found.' });
-    }
-
-    // Owner check
-    if (existing.ownerEmail.toLowerCase() !== req.user.email.toLowerCase()) {
-      return res.status(403).json({
-        success: false,
-        error: 'Forbidden: You can only delete your own listings.'
-      });
     }
 
     await clothesCollection.deleteOne({ _id: new ObjectId(id) });
@@ -381,4 +389,3 @@ router.delete('/:id', verifyJWT, async (req, res) => {
 });
 
 export default router;
-

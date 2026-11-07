@@ -59,7 +59,7 @@ router.post('/register', async (req, res) => {
       email: normalizedEmail,
       photoURL: photoURL && photoURL.trim() ? photoURL.trim() : defaultAvatar,
       password: hashedPassword,
-      role: 'designer',
+      role: 'customer',
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -71,7 +71,8 @@ router.post('/register', async (req, res) => {
         userId: result.insertedId.toString(),
         email: newUser.email,
         name: newUser.name,
-        photoURL: newUser.photoURL
+        photoURL: newUser.photoURL,
+        role: newUser.role
       },
       JWT_SECRET,
       { expiresIn: '7d' }
@@ -127,12 +128,15 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Incorrect password. Please try again.' });
     }
 
+    const userRole = user.role || 'customer';
+
     const token = jwt.sign(
       {
         userId: user._id.toString(),
         email: user.email,
         name: user.name,
-        photoURL: user.photoURL
+        photoURL: user.photoURL,
+        role: userRole
       },
       JWT_SECRET,
       { expiresIn: '7d' }
@@ -149,7 +153,7 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         photoURL: user.photoURL,
-        role: user.role || 'designer'
+        role: userRole
       }
     });
   } catch (error) {
@@ -174,10 +178,10 @@ router.post('/social-login', async (req, res) => {
 
     if (!user) {
       const newUser = {
-        name: (name || 'Fashion Designer').trim(),
+        name: (name || 'Shopper').trim(),
         email: normalizedEmail,
         photoURL: photoURL || '/client-review-2.jpg',
-        role: 'designer',
+        role: 'customer',
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -191,12 +195,15 @@ router.post('/social-login', async (req, res) => {
       user.photoURL = photoURL;
     }
 
+    const userRole = user.role || 'customer';
+
     const token = jwt.sign(
       {
         userId: user._id.toString(),
         email: user.email,
         name: user.name,
-        photoURL: user.photoURL
+        photoURL: user.photoURL,
+        role: userRole
       },
       JWT_SECRET,
       { expiresIn: '7d' }
@@ -213,7 +220,7 @@ router.post('/social-login', async (req, res) => {
         name: user.name,
         email: user.email,
         photoURL: user.photoURL,
-        role: user.role || 'designer'
+        role: userRole
       }
     });
   } catch (error) {
@@ -225,27 +232,47 @@ router.post('/social-login', async (req, res) => {
 // Current User Session verification (Used on page refresh to keep user logged in on private routes)
 router.get('/me', verifyJWT, async (req, res) => {
   try {
-    const { usersCollection } = getCollections();
-    const normalizedEmail = req.user.email.toLowerCase();
-    let user = await usersCollection.findOne({ email: normalizedEmail });
+    const db = await connectDB();
+    const normalizedEmail = req.user.email.toLowerCase().trim();
+    const docUsers = await db.collection('users').findOne({ email: normalizedEmail });
+    const docUser = await db.collection('user').findOne({ email: normalizedEmail });
 
-    if (!user) {
-      const db = await connectDB();
-      user = await db.collection('user').findOne({ email: normalizedEmail });
+    let activeRole = 'customer';
+    if (docUsers?.role === 'customer' || docUser?.role === 'customer') {
+      activeRole = 'customer';
+    } else if (docUsers?.role === 'admin' || docUser?.role === 'admin') {
+      activeRole = 'admin';
+    } else {
+      activeRole = docUsers?.role || docUser?.role || 'customer';
     }
 
-    if (!user) {
+    // Keep both collections in sync
+    if (docUsers && docUsers.role !== activeRole) {
+      await db.collection('users').updateOne(
+        { email: normalizedEmail },
+        { $set: { role: activeRole, updatedAt: new Date() } }
+      );
+    }
+    if (docUser && docUser.role !== activeRole) {
+      await db.collection('user').updateOne(
+        { email: normalizedEmail },
+        { $set: { role: activeRole, updatedAt: new Date() } }
+      );
+    }
+
+    const matchedUser = docUsers || docUser;
+    if (!matchedUser) {
       return res.status(404).json({ success: false, error: 'User profile not found.' });
     }
 
     return res.json({
       success: true,
       user: {
-        id: user._id.toString(),
-        name: user.name,
-        email: user.email,
-        photoURL: user.image || user.photoURL || '/client-review-1.jpg',
-        role: user.role || 'designer'
+        id: matchedUser._id.toString(),
+        name: matchedUser.name,
+        email: matchedUser.email,
+        photoURL: matchedUser.image || matchedUser.photoURL || '/client-review-1.jpg',
+        role: activeRole
       }
     });
   } catch (error) {
@@ -261,4 +288,3 @@ router.post('/logout', (req, res) => {
 });
 
 export default router;
-

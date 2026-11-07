@@ -85,18 +85,32 @@ export async function verifyJWT(req, res, next) {
             queryConditions.push({ _id: new ObjectId(session.userId) });
           }
 
-          let user = await db.collection('user').findOne({ $or: queryConditions });
-          if (!user) {
-            user = await db.collection('users').findOne({ $or: queryConditions });
+          let docUser = await db.collection('user').findOne({ $or: queryConditions });
+          let docUsers = null;
+          const userEmail = (docUser?.email || '').toLowerCase().trim();
+          if (userEmail) {
+            docUsers = await db.collection('users').findOne({ email: userEmail });
+          } else {
+            docUsers = await db.collection('users').findOne({ $or: queryConditions });
           }
 
-          if (user) {
+          let activeRole = 'customer';
+          if (docUsers?.role === 'customer' || docUser?.role === 'customer') {
+            activeRole = 'customer';
+          } else if (docUsers?.role === 'admin' || docUser?.role === 'admin') {
+            activeRole = 'admin';
+          } else {
+            activeRole = docUsers?.role || docUser?.role || 'customer';
+          }
+
+          const matchedUser = docUser || docUsers;
+          if (matchedUser) {
             req.user = {
-              userId: user._id?.toString() || user.id,
-              email: user.email,
-              name: user.name,
-              photoURL: user.image || user.photoURL || '/client-review-1.jpg',
-              role: user.role || 'designer'
+              userId: matchedUser._id?.toString() || matchedUser.id,
+              email: matchedUser.email,
+              name: matchedUser.name,
+              photoURL: matchedUser.image || matchedUser.photoURL || '/client-review-1.jpg',
+              role: activeRole
             };
             return next();
           }
@@ -112,7 +126,29 @@ export async function verifyJWT(req, res, next) {
     try {
       const decoded = jwt.verify(rawToken, JWT_SECRET);
       if (decoded) {
-        req.user = decoded;
+        let currentRole = 'customer';
+        try {
+          const db = await connectDB();
+          if (db && decoded.email) {
+            const normalizedEmail = decoded.email.toLowerCase().trim();
+            const docUsers = await db.collection('users').findOne({ email: normalizedEmail });
+            const docUser = await db.collection('user').findOne({ email: normalizedEmail });
+            if (docUsers?.role === 'customer' || docUser?.role === 'customer') {
+              currentRole = 'customer';
+            } else if (docUsers?.role === 'admin' || docUser?.role === 'admin') {
+              currentRole = 'admin';
+            } else {
+              currentRole = docUsers?.role || docUser?.role || decoded.role || 'customer';
+            }
+          }
+        } catch {
+          currentRole = decoded.role || 'customer';
+        }
+
+        req.user = {
+          ...decoded,
+          role: currentRole
+        };
         return next();
       }
     } catch {
@@ -129,4 +165,25 @@ export async function verifyJWT(req, res, next) {
     success: false,
     error: 'Invalid or expired authentication token. Please log in again.'
   });
+}
+
+/**
+ * Middleware to restrict route access strictly to admin role
+ */
+export function verifyAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: 'Access denied. Authentication required.'
+    });
+  }
+
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      error: 'Access denied. Administrator privileges required.'
+    });
+  }
+
+  next();
 }
